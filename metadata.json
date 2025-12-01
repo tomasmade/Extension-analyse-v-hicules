@@ -1,0 +1,5 @@
+{
+  "name": "AutoMate - Car Buying Assistant",
+  "description": "A Chrome Extension simulation that analyzes car listings to provide estimated maintenance costs, insurance prices, and AI-powered reliability ratings.",
+  "requestFramePermissions": []
+}
