@@ -1,4 +1,4 @@
-import { CarDetails, CostEstimation } from '../types';
+import { CarDetails, CostEstimation, CostBreakdownItem } from '../types';
 
 // Tables de correspondance simplifiées (Mock Data)
 const BASE_MAINTENANCE: Record<string, number> = {
@@ -17,6 +17,40 @@ const BASE_INSURANCE: Record<string, number> = {
   'Tesla': 1100, // Puissance fiscale souvent élevée malgré l'électrique
   'Audi': 1400,
   'Volkswagen': 900
+};
+
+/**
+ * Génère une répartition réaliste des coûts basée sur le total
+ */
+const generateMaintenanceBreakdown = (totalCost: number, car: CarDetails): CostBreakdownItem[] => {
+  // Répartition théorique approximative
+  const breakdown: CostBreakdownItem[] = [];
+  
+  // 1. Révision (Vidange, filtres...) ~30-40%
+  const revisionCost = Math.round(totalCost * 0.35);
+  breakdown.push({
+    category: car.fuel === 'Électrique' ? 'Check-up système' : 'Révision (Vidange/Filtres)',
+    cost: revisionCost,
+    frequency: 'Annuel'
+  });
+
+  // 2. Consommables (Pneus, Freins) ~40%
+  const wearCost = Math.round(totalCost * 0.40);
+  breakdown.push({
+    category: 'Pièces d\'usure (Pneus/Freins)',
+    cost: wearCost,
+    frequency: 'Moyenne lissée'
+  });
+
+  // 3. Imprévus / Divers ~25%
+  const unexpectedCost = totalCost - revisionCost - wearCost;
+  breakdown.push({
+    category: 'Imprévus & Divers',
+    cost: unexpectedCost,
+    frequency: 'Variable'
+  });
+
+  return breakdown;
 };
 
 /**
@@ -61,7 +95,8 @@ export const estimateCosts = (car: CarDetails): CostEstimation => {
       min: Math.round(estMaint * 0.8),
       max: Math.round(estMaint * 1.2),
       average: estMaint,
-      level: getLevel(estMaint, 'maint')
+      level: getLevel(estMaint, 'maint'),
+      breakdown: generateMaintenanceBreakdown(estMaint, car)
     },
     insuranceYearly: {
       min: Math.round(estInsur * 0.8),

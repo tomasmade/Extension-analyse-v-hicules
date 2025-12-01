@@ -10,12 +10,19 @@ export interface CarDetails {
   title: string;
 }
 
+export interface CostBreakdownItem {
+  category: string;
+  cost: number;
+  frequency: string; // ex: "Annuel", "Tous les 2 ans", "Variable"
+}
+
 export interface CostEstimation {
   maintenanceYearly: {
     min: number;
     max: number;
     average: number;
     level: 'low' | 'medium' | 'high';
+    breakdown: CostBreakdownItem[];
   };
   insuranceYearly: {
     min: number;

@@ -31,7 +31,7 @@ const GENERIC_CARS: CarDetails[] = [
   }
 ];
 
-// Mock Data simulant une annonce Leboncoin (structure brute JSON-LD simulée)
+// Mock Data simulant une annonce Leboncoin
 const LBC_MOCK_DATA = {
   make: 'Renault',
   model: 'Clio',
@@ -51,19 +51,11 @@ const App: React.FC = () => {
 
   // Simulation du Content Script
   useEffect(() => {
-    // 1. On "Nettoie" l'état précédent
     setDetectedCar(null);
-
-    // 2. On simule le parsing selon le site choisi
-    // Dans une vraie extension, `url` serait window.location.href
     const simulatedUrl = siteMode === 'leboncoin' ? 'https://www.leboncoin.fr/voitures/123456.htm' : 'https://autolistings.com/ad/1';
     
-    // NOTE: Ici, pour la démo React, on "triche" un peu en passant directement l'objet
-    // car on ne peut pas vraiment scraper le vrai DOM du navigateur dans cet environnement sandboxed.
-    // Cependant, le service `extractCarDetailsFromDOM` est prêt à recevoir un vrai `document`.
-    
     if (siteMode === 'leboncoin') {
-      // Simulation: On injecte un script JSON-LD fake dans le head pour tester notre parser LBC
+      // Simulation JSON-LD pour LBC
       const scriptId = 'fake-lbc-json-ld';
       const existingScript = document.getElementById(scriptId);
       if (existingScript) existingScript.remove();
@@ -84,18 +76,13 @@ const App: React.FC = () => {
       });
       document.body.appendChild(script);
 
-      // Appel du parser (qui va lire le script qu'on vient d'injecter)
       setTimeout(() => {
         const car = extractCarDetailsFromDOM(document, simulatedUrl);
         setDetectedCar(car);
       }, 100);
 
     } else {
-      // Mode Site Générique
-      const carOnPage = GENERIC_CARS[currentCarIndex];
-      // On passe directement l'objet pour la démo UI, 
-      // car le parser générique mocké dans `domParser` est très basique
-      setDetectedCar(carOnPage); 
+      setDetectedCar(GENERIC_CARS[currentCarIndex]); 
     }
 
   }, [siteMode, currentCarIndex]);
@@ -103,8 +90,8 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col font-sans bg-gray-50">
       
-      {/* Barre de contrôle de la simulation (DEV TOOLS) */}
-      <div className="bg-gray-800 text-gray-200 text-xs p-2 flex justify-center items-center gap-4 border-b border-gray-700">
+      {/* Barre DEV TOOLS */}
+      <div className="bg-gray-800 text-gray-200 text-xs p-2 flex justify-center items-center gap-4 border-b border-gray-700 z-50">
         <span className="uppercase tracking-widest font-bold text-gray-500">Mode Développeur</span>
         <div className="flex items-center gap-2">
           <LucideGlobe size={14} />
@@ -115,17 +102,17 @@ const App: React.FC = () => {
             className="bg-gray-700 text-white rounded px-2 py-1 border border-gray-600 focus:outline-none"
           >
             <option value="generic">Site Générique (Demo)</option>
-            <option value="leboncoin">LeBonCoin.fr (Simulation JSON-LD)</option>
+            <option value="leboncoin">LeBonCoin.fr (Intégration Native)</option>
           </select>
         </div>
       </div>
 
       {/* Header du "Faux Site" */}
-      <header className={`${siteMode === 'leboncoin' ? 'bg-[#ff6e14]' : 'bg-blue-900'} text-white p-4 shadow-md sticky top-0 z-10 transition-colors duration-500`}>
-        <div className="container mx-auto flex justify-between items-center">
+      <header className={`${siteMode === 'leboncoin' ? 'bg-white text-black border-b border-gray-200' : 'bg-blue-900 text-white shadow-md'} p-4 sticky top-0 z-40 transition-colors duration-500`}>
+        <div className="container mx-auto flex justify-between items-center max-w-6xl">
           <div className="flex items-center gap-2">
             {siteMode === 'leboncoin' ? (
-              <span className="font-bold text-2xl tracking-tighter italic">leboncoin</span>
+              <span className="font-bold text-3xl tracking-tighter text-[#ec5a13]">leboncoin</span>
             ) : (
               <>
                 <LucideCar className="w-6 h-6" />
@@ -133,17 +120,18 @@ const App: React.FC = () => {
               </>
             )}
           </div>
+          {siteMode === 'leboncoin' && (
+             <button className="bg-[#ec5a13] text-white px-4 py-1.5 rounded-lg font-bold text-sm">Déposer une annonce</button>
+          )}
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-grow container mx-auto p-4 md:p-8 flex flex-col lg:flex-row gap-8 relative">
+      <main className="flex-grow container mx-auto p-4 md:p-8 relative max-w-7xl">
         
-        {/* Left Side: The "Website" Content */}
-        <div className="w-full lg:w-3/4">
-          
-          {siteMode === 'generic' && (
-            <div className="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        {/* Navigation Demo pour site générique */}
+        {siteMode === 'generic' && (
+            <div className="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-200 max-w-4xl mx-auto">
                <div className="flex items-center gap-2 text-gray-600">
                  <LucideInfo className="w-5 h-5 text-blue-500" />
                  <p className="text-sm">Changez de véhicule pour voir l'extension réagir.</p>
@@ -164,33 +152,40 @@ const App: React.FC = () => {
                   ))}
                </div>
             </div>
-          )}
+        )}
 
-          {/* Rendu du contenu de la page (Mock) */}
-          {siteMode === 'leboncoin' ? (
-             <CarListingMock car={LBC_MOCK_DATA as CarDetails} />
-          ) : (
-             <CarListingMock car={GENERIC_CARS[currentCarIndex]} />
-          )}
+        {/* RENDU PRINCIPAL */}
+        {siteMode === 'leboncoin' ? (
+           // MODE LBC: On passe le widget comme composant enfant pour qu'il soit rendu DANS la grille
+           <CarListingMock 
+              car={LBC_MOCK_DATA as CarDetails} 
+              isLbcMode={true}
+              extensionComponent={
+                detectedCar && (
+                  <ExtensionWidget 
+                    car={detectedCar} 
+                    mode="inline" 
+                  />
+                )
+              }
+           />
+        ) : (
+           // MODE GÉNÉRIQUE: Le widget est géré à l'extérieur (flottant)
+           <CarListingMock car={GENERIC_CARS[currentCarIndex]} isLbcMode={false} />
+        )}
 
-        </div>
-
-        {/* The Extension UI */}
-        {isExtensionVisible && detectedCar && (
-          <div className="hidden lg:block lg:w-1/4 relative animate-in slide-in-from-right duration-500">
-             <div className="sticky top-24">
-                <ExtensionWidget car={detectedCar} onClose={() => setIsExtensionVisible(false)} />
-             </div>
+        {/* Floating Widget (Uniquement pour le site générique maintenant) */}
+        {siteMode === 'generic' && isExtensionVisible && detectedCar && (
+          <div className="fixed top-24 right-8 z-50 animate-in slide-in-from-right duration-500">
+             <ExtensionWidget 
+                car={detectedCar} 
+                mode="floating"
+                onClose={() => setIsExtensionVisible(false)} 
+             />
           </div>
         )}
-      </main>
 
-      {/* Mobile/Overlay Simulation */}
-      {isExtensionVisible && detectedCar && (
-        <div className="lg:hidden fixed bottom-4 right-4 z-50">
-           <ExtensionWidget car={detectedCar} minimizedByDefault={true} onClose={() => setIsExtensionVisible(false)} />
-        </div>
-      )}
+      </main>
     </div>
   );
 };
