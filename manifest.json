@@ -5,21 +5,25 @@
   "description": "Affiche les coûts d'entretien et d'assurance estimés sur les annonces automobiles.",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.leboncoin.fr/*",
+    "https://www.lacentrale.fr/*"
   ],
   "content_scripts": [
     {
       "matches": [
-        "*://*.lacentrale.fr/*",
-        "*://*.leboncoin.fr/*",
-        "*://*.autoscout24.fr/*"
+        "https://www.leboncoin.fr/*",
+        "https://www.lacentrale.fr/*"
       ],
-      "js": ["content.js"],
-      "css": ["styles.css"]
+      "js": ["assets/content.js"],
+      "css": ["assets/style.css"],
+      "run_at": "document_idle"
     }
   ],
   "action": {
-    "default_popup": "popup.html",
     "default_title": "AutoMate Assistant"
   },
   "icons": {
