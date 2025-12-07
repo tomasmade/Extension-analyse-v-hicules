@@ -30,6 +30,11 @@ export interface CostEstimation {
     average: number;
     level: 'low' | 'medium' | 'high';
   };
+  fuel: {
+    consumptionLiters: number; // L/100km ou kWh/100km
+    monthlyCost: number;      // Coût estimé par mois
+    unit: 'L/100km' | 'kWh/100km';
+  };
   reliabilityScore: number; // 0 to 10
   commonIssues: string[];
 }

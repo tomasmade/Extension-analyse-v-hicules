@@ -19,6 +19,14 @@ const BASE_INSURANCE: Record<string, number> = {
   'Volkswagen': 900
 };
 
+// Prix moyens carburants (pour simulation)
+const FUEL_PRICES = {
+  'Diesel': 1.75,
+  'Essence': 1.85,
+  'Électrique': 0.25, // prix du kWh à la maison approx
+  'Hybride': 1.80
+};
+
 /**
  * Génère une répartition réaliste des coûts basée sur le total
  */
@@ -51,6 +59,45 @@ const generateMaintenanceBreakdown = (totalCost: number, car: CarDetails): CostB
   });
 
   return breakdown;
+};
+
+/**
+ * Estime la consommation et le budget carburant mensuel
+ */
+const estimateFuel = (car: CarDetails) => {
+  const isElectric = car.fuel === 'Électrique';
+  const isDiesel = car.fuel === 'Diesel';
+  const kmPerMonth = 1250; // Base 15 000 km / an
+
+  let consumption = 0;
+  
+  // Estimation basique de la conso
+  if (isElectric) {
+    consumption = 16; // kWh/100km moyen
+    if (car.make === 'Tesla') consumption = 15; // Efficience
+    if (car.make === 'Audi') consumption = 20; // e-tron gourmand
+  } else {
+    // Thermique (L/100km)
+    consumption = isDiesel ? 5.5 : 7.0; // Base
+    
+    // Ajustement selon marque/puissance supposée
+    if (['BMW', 'Audi'].includes(car.make)) consumption += 1.5;
+    if (car.make === 'Renault' && car.model === 'Clio') consumption -= 0.5;
+  }
+
+  // Calcul coût mensuel
+  // (Conso / 100) * KM_MOIS * PRIX_UNITAIRE
+  let pricePerUnit = FUEL_PRICES['Essence'];
+  if (isDiesel) pricePerUnit = FUEL_PRICES['Diesel'];
+  if (isElectric) pricePerUnit = FUEL_PRICES['Électrique'];
+
+  const monthlyCost = (consumption / 100) * kmPerMonth * pricePerUnit;
+
+  return {
+    consumptionLiters: parseFloat(consumption.toFixed(1)),
+    monthlyCost: Math.round(monthlyCost),
+    unit: (isElectric ? 'kWh/100km' : 'L/100km') as 'L/100km' | 'kWh/100km'
+  };
 };
 
 /**
@@ -104,6 +151,7 @@ export const estimateCosts = (car: CarDetails): CostEstimation => {
       average: estInsur,
       level: getLevel(estInsur, 'insur')
     },
+    fuel: estimateFuel(car),
     reliabilityScore: car.make === 'Tesla' ? 7 : (car.make === 'BMW' ? 8 : 6), // Mock simple
     commonIssues: mockCommonIssues(car.make)
   };

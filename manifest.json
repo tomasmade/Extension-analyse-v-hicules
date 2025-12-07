@@ -19,7 +19,7 @@
         "https://www.lacentrale.fr/*"
       ],
       "js": ["assets/content.js"],
-      "css": ["assets/style.css"],
+      "css": ["assets/content.css"],
       "run_at": "document_idle"
     }
   ],

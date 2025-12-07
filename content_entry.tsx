@@ -2,22 +2,10 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { ExtensionWidget } from './components/ExtensionWidget';
 import { extractCarDetailsFromDOM } from './services/domParser';
+import './index.css'; // Import du CSS pour que Vite le compile
 
 // ID pour éviter d'injecter plusieurs fois l'extension
 const EXTENSION_ROOT_ID = 'automate-extension-root';
-const TAILWIND_CDN = 'https://cdn.tailwindcss.com';
-
-/**
- * Injecte le CSS Tailwind dans la page cible (Méthode rapide pour le Dev)
- * En prod, on builderait un fichier CSS statique.
- */
-const injectStyles = () => {
-  if (!document.querySelector(`script[src="${TAILWIND_CDN}"]`)) {
-    const script = document.createElement('script');
-    script.src = TAILWIND_CDN;
-    document.head.appendChild(script);
-  }
-};
 
 /**
  * Tente de trouver le meilleur endroit pour insérer l'extension
@@ -44,17 +32,18 @@ const mountExtension = () => {
   if (document.getElementById(EXTENSION_ROOT_ID)) return;
 
   // 2. Parser les infos de la voiture
+  // On passe l'URL actuelle
   const carDetails = extractCarDetailsFromDOM(document, window.location.href);
 
   // Si on ne trouve pas de voiture (ex: page d'accueil), on ne fait rien
   if (!carDetails) {
-    console.log("AutoMate: Aucune voiture détectée sur cette page.");
+    // On log discret pour le debug, mais en prod on peut retirer
+    // console.log("AutoMate: Aucune voiture détectée sur cette page.");
     return;
   }
 
   console.log("AutoMate: Voiture détectée !", carDetails);
-  injectStyles();
-
+  
   // 3. Créer le conteneur
   const targetElement = findInjectionTarget();
   const container = document.createElement('div');

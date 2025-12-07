@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CarDetails, CostEstimation } from '../types';
 import { estimateCosts } from '../services/carEstimationService';
-import { LucideWrench, LucideShieldCheck, LucideZap, LucideChevronDown, LucideChevronUp, LucideX, LucideSparkles, LucideArrowRight, LucideArrowLeft, LucidePieChart } from 'lucide-react';
+import { LucideWrench, LucideShieldCheck, LucideZap, LucideChevronDown, LucideChevronUp, LucideX, LucideSparkles, LucideArrowRight, LucideArrowLeft, LucidePieChart, LucideFuel } from 'lucide-react';
 
 interface ExtensionWidgetProps {
   car: CarDetails;
@@ -94,7 +94,9 @@ export const ExtensionWidget: React.FC<ExtensionWidgetProps> = ({
             
             {!showMaintenanceDetails ? (
               // VUE D'ENSEMBLE (SUMMARY)
-              <div className="space-y-4">
+              <div className="space-y-3">
+                
+                {/* LIGNE 1 : ENTRETIEN & ASSURANCE */}
                 <div className="grid grid-cols-2 gap-3">
                   {/* Carte Entretien Interactive */}
                   <div 
@@ -124,6 +126,25 @@ export const ExtensionWidget: React.FC<ExtensionWidgetProps> = ({
                        <div className="text-[10px] text-blue-600 leading-tight">Jeune permis estimé</div>
                      </div>
                   </div>
+                </div>
+
+                {/* LIGNE 2 : CARBURANT */}
+                <div className="bg-green-50 p-3 rounded-lg border border-green-100 flex items-center justify-between">
+                   <div>
+                     <div className="flex items-center gap-1 mb-1 text-green-700">
+                       <LucideFuel size={14} />
+                       <span className="text-xs font-bold">Carburant estimé</span>
+                     </div>
+                     <div className="text-[10px] text-green-800">
+                        Base 15 000 km/an
+                     </div>
+                   </div>
+                   <div className="text-right">
+                      <div className="text-lg font-bold text-green-900">{costs.fuel.monthlyCost}€<span className="text-xs font-normal">/mois</span></div>
+                      <div className="text-[10px] font-medium text-green-700 bg-green-200/50 px-1.5 py-0.5 rounded inline-block">
+                        ~ {costs.fuel.consumptionLiters} {costs.fuel.unit}
+                      </div>
+                   </div>
                 </div>
 
                 {/* Reliability Warning */}
