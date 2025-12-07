@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "AutoMate - Assistant Achat Auto",
+  "version": "1.0.0",
+  "description": "Affiche les coûts d'entretien et d'assurance estimés sur les annonces automobiles.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.leboncoin.fr/*",
+    "https://www.lacentrale.fr/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.leboncoin.fr/*",
+        "https://www.lacentrale.fr/*"
+      ],
+      "js": ["assets/content.js"],
+      "css": ["assets/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "AutoMate Assistant"
+  }
+}

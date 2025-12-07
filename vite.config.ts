@@ -18,7 +18,7 @@ export default defineConfig({
       output: {
         entryFileNames: 'assets/[name].js',
         chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]' // Générera assets/content.css
+        assetFileNames: 'assets/[name].[ext]'
       }
     }
   }

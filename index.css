@@ -2,8 +2,40 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Ajustements pour éviter les conflits avec le CSS du site hôte */
+/* 
+  RESET LOCAL SCOPÉ 
+  Comme on a désactivé le "preflight" global, on doit réinitialiser 
+  les styles de base UNIQUEMENT à l'intérieur de notre extension 
+  pour ne pas hériter des styles bizarres de LeBonCoin.
+*/
+
 #automate-extension-root {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  color: #1f2937; /* text-gray-800 par défaut */
+}
+
+/* Réplique du reset Tailwind mais uniquement pour nos éléments */
+#automate-extension-root *,
+#automate-extension-root *::before,
+#automate-extension-root *::after {
+  box-sizing: border-box;
+  border-width: 0;
+  border-style: solid;
+  border-color: #e5e7eb; /* gray-200 */
+}
+
+/* Fix pour les images dans l'extension */
+#automate-extension-root img,
+#automate-extension-root svg {
+  display: block;
+  vertical-align: middle;
+}
+
+/* Fix pour les boutons qui pourraient hériter du style LBC */
+#automate-extension-root button {
+  cursor: pointer;
+  background-color: transparent;
+  background-image: none;
 }

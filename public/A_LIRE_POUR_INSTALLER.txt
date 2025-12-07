@@ -1,0 +1,5 @@
+BRAVO ! SI VOUS LISEZ CE FICHIER, C'EST QUE LE BUILD A FONCTIONNÉ.
+
+C'est CE dossier "dist" (où se trouve ce fichier texte) que vous devez sélectionner dans Chrome lors de l'étape "Charger l'extension non empaquetée".
+
+Ne sélectionnez pas le dossier parent. Sélectionnez bien le dossier "dist".
