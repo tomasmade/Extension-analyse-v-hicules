@@ -8,6 +8,7 @@ export interface CarDetails {
   mileage: number;
   imageUrl?: string;
   title: string;
+  imageCount?: number;
 }
 
 export interface CostBreakdownItem {
