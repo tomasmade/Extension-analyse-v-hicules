@@ -1,61 +1,54 @@
 import { CarDetails, CostEstimation, CostBreakdownItem } from '../types';
+import { findPreciseCarData } from './carDatabase';
 
-// Tables de correspondance simplifiées (Mock Data)
-const BASE_MAINTENANCE: Record<string, number> = {
-  'Peugeot': 600,
-  'Renault': 550,
-  'Citroen': 580,
-  'Dacia': 450,
-  'BMW': 1200,
-  'Mercedes': 1300,
-  'Tesla': 300, 
-  'Audi': 1100,
-  'Volkswagen': 850,
-  'Toyota': 500,
-  'Ford': 650
+// Tables de correspondance génériques (Fallback)
+const SEGMENT_COSTS: Record<string, { maint: number, insur: number }> = {
+  'CITY': { maint: 600, insur: 700 },     // Citadines (Clio, 208)
+  'COMPACT': { maint: 800, insur: 900 },  // Compactes (Golf, 308)
+  'SUV': { maint: 950, insur: 1000 },     // SUV (3008, Tiguan)
+  'PREMIUM': { maint: 1300, insur: 1400 }, // BMW, Merco, Tesla
+  'LUXURY': { maint: 2000, insur: 2500 }   // Porsche, etc.
 };
 
-const BASE_INSURANCE: Record<string, number> = {
-  'Peugeot': 700,
-  'Renault': 650,
-  'Citroen': 600,
-  'Dacia': 450,
-  'BMW': 1500,
-  'Mercedes': 1600,
-  'Tesla': 1100,
-  'Audi': 1400,
-  'Volkswagen': 900,
-  'Toyota': 600,
-  'Ford': 750
-};
-
-// Prix moyens carburants
 const FUEL_PRICES = {
   'Diesel': 1.75,
   'Essence': 1.85,
   'Électrique': 0.25,
+  'Electrique': 0.25,
   'Hybride': 1.80
 };
 
-const generateMaintenanceBreakdown = (totalCost: number, car: CarDetails): CostBreakdownItem[] => {
-  const breakdown: CostBreakdownItem[] = [];
+// ... (Fonctions helpers inchangées) ...
+
+const getSegment = (car: CarDetails): string => {
+  const model = car.model.toUpperCase();
+  const make = car.make.toUpperCase();
   
-  // Plus la voiture est kilométrée, plus la part "Imprévus/Réparations" augmente par rapport à la révision simple
+  if (make === 'PORSCHE' || make === 'MASERATI') return 'LUXURY';
+  if (['BMW', 'AUDI', 'MERCEDES', 'TESLA', 'LEXUS', 'VOLVO'].includes(make)) return 'PREMIUM';
+  if (model.includes('3008') || model.includes('5008') || model.includes('TIGUAN') || model.includes('X3') || model.includes('Q5')) return 'SUV';
+  if (model.includes('GOLF') || model.includes('308') || model.includes('MEGANE') || model.includes('A3') || model.includes('SERIE 1')) return 'COMPACT';
+  
+  return 'CITY'; // Défaut
+};
+
+const generateMaintenanceBreakdown = (totalCost: number, car: CarDetails, isElectric: boolean): CostBreakdownItem[] => {
+  const breakdown: CostBreakdownItem[] = [];
   const isHighMileage = car.mileage > 120000;
 
-  const revisionShare = isHighMileage ? 0.25 : 0.40; // La révision pèse moins dans le total si on a de grosses pannes
-  const wearShare = 0.35;
+  const revisionShare = isElectric ? 0.2 : (isHighMileage ? 0.25 : 0.40);
+  const wearShare = isElectric ? 0.5 : 0.35; // Les VE usent plus de pneus
   
   const revisionCost = Math.round(totalCost * revisionShare);
   breakdown.push({
-    category: car.fuel === 'Électrique' ? 'Maintenance Système' : 'Révision annuelle',
+    category: isElectric ? 'Maintenance Système' : 'Révision annuelle',
     cost: revisionCost,
     frequency: 'Annuel'
   });
 
   const wearCost = Math.round(totalCost * wearShare);
   breakdown.push({
-    category: 'Pièces d\'usure (Pneus/Freins)',
+    category: isElectric ? 'Pneus & Trains roulants' : 'Pièces d\'usure (Pneus/Freins)',
     cost: wearCost,
     frequency: 'Lissée sur l\'année'
   });
@@ -70,134 +63,122 @@ const generateMaintenanceBreakdown = (totalCost: number, car: CarDetails): CostB
   return breakdown;
 };
 
-const estimateFuel = (car: CarDetails) => {
-  const isElectric = car.fuel === 'Électrique' || car.fuel === 'Electrique';
-  const isDiesel = car.fuel === 'Diesel';
-  const kmPerMonth = 1250; // Base 15 000 km / an
-
-  let consumption = 0;
-  
-  if (isElectric) {
-    consumption = 16; 
-    if (car.make === 'Tesla') consumption = 15;
-    if (['Audi', 'BMW', 'Mercedes'].includes(car.make)) consumption = 19;
-  } else {
-    consumption = isDiesel ? 5.5 : 7.0;
-    if (['BMW', 'Audi', 'Mercedes'].includes(car.make)) consumption += 1.5;
-    if (car.make === 'Renault' && car.model.includes('Clio')) consumption -= 0.5;
-    if (car.make === 'Toyota' && car.model.includes('Yaris')) consumption -= 1.0; // Hybride souvent
-  }
-
-  let pricePerUnit = FUEL_PRICES['Essence'];
-  if (isDiesel) pricePerUnit = FUEL_PRICES['Diesel'];
-  if (isElectric) pricePerUnit = FUEL_PRICES['Électrique'];
-
-  const monthlyCost = (consumption / 100) * kmPerMonth * pricePerUnit;
-
-  return {
-    consumptionLiters: parseFloat(consumption.toFixed(1)),
-    monthlyCost: Math.round(monthlyCost),
-    unit: (isElectric ? 'kWh/100km' : 'L/100km') as 'L/100km' | 'kWh/100km'
-  };
-};
-
-/**
- * Calcul du score de fiabilité (0-10)
- */
-const calculateReliability = (car: CarDetails): { score: number, issues: string[] } => {
-  let score = 8; // Départ optimiste
-  const issues: string[] = [];
-
-  // Marques réputées fiables
-  if (['Toyota', 'Honda', 'Lexus', 'Mazda'].includes(car.make)) {
-    score += 1;
-    issues.push('Marque réputée très fiable');
-  }
-  // Marques avec soucis électroniques fréquents (stéréotype pour la démo)
-  if (['Peugeot', 'Citroen', 'Renault'].includes(car.make) && car.year < 2018) {
-    score -= 1;
-    issues.push('Électronique parfois capricieuse');
-  }
-
-  // Facteur Kilométrage (Impact fort)
-  if (car.mileage > 200000) {
-    score -= 3;
-    issues.push('Kilométrage très élevé : risques importants');
-  } else if (car.mileage > 120000) {
-    score -= 1;
-    issues.push('Kilométrage avancé : prévoir pièces d\'usure');
-  }
-
-  // Facteur Âge
-  const age = new Date().getFullYear() - car.year;
-  if (age > 15) {
-    score -= 1;
-    issues.push('Véhicule ancien : étanchéité moteur à surveiller');
-  }
-
-  // Cap le score entre 1 et 10
-  score = Math.max(1, Math.min(10, score));
-
-  // Ajout de problèmes génériques si la liste est vide
-  if (issues.length === 0) issues.push('Usure normale pour ce modèle');
-  if (issues.length === 1 && score < 6) issues.push('Injecteurs ou Turbo à vérifier');
-
-  return { score, issues };
-};
+// ... (Reste des helpers) ...
 
 export const estimateCosts = (car: CarDetails): CostEstimation => {
-  const baseMaint = BASE_MAINTENANCE[car.make] || 800;
-  const baseInsur = BASE_INSURANCE[car.make] || 1000;
+  // 1. TENTATIVE DE RECONNAISSANCE PRÉCISE (Database)
+  const preciseData = findPreciseCarData(car.title + ' ' + car.model, car.make);
+  
+  let baseMaint = 0;
+  let baseInsur = 0;
+  let reliabilityScore = 0;
+  let commonIssues: string[] = [];
+  let consumption = 0;
+  let isVerified = false;
 
   const currentYear = new Date().getFullYear();
   const age = currentYear - car.year;
-  
-  // ALGORITHME V2 : IMPACT DU KILOMÉTRAGE
-  // +15% de coût d'entretien tous les 50 000km au-delà des premiers 50k
-  const mileagePenalty = Math.max(0, Math.floor((car.mileage - 50000) / 50000) * 0.15);
-  
-  // +3% par an d'ancienneté (pièces vieillissantes)
-  let maintMultiplier = 1 + (age * 0.03) + mileagePenalty; 
-  
-  // Assurance baisse avec l'âge du véhicule
-  let insurMultiplier = 1 - (age * 0.02); 
+  const isElectric = car.fuel.toUpperCase().includes('ELECTRI') || car.fuel.toUpperCase().includes('ÉLECTRI');
+  const isDiesel = car.fuel.toUpperCase().includes('DIESEL');
 
-  if (car.fuel === 'Électrique') {
-    maintMultiplier *= 0.7; // Entretien moins cher
-    insurMultiplier *= 1.15; // Assurance plus chère (experts spécialisés, pièces)
-  } else if (['BMW', 'Audi', 'Mercedes'].includes(car.make)) {
-     maintMultiplier *= 1.25; // Premium
+  if (preciseData) {
+    // --- MODE PRÉCIS ---
+    isVerified = true;
+    baseMaint = preciseData.maintenanceCost;
+    baseInsur = preciseData.insuranceCost;
+    reliabilityScore = preciseData.reliabilityScore;
+    commonIssues = [...preciseData.knownIssues];
+    
+    // Ajout du conseil spécifique dans les issues pour l'affichage
+    if (preciseData.specificAdvice) {
+       // On le mettra en évidence dans l'UI idéalement, mais ici on l'ajoute aux issues
+    }
+
+    // Récupération consommation exacte
+    if (isElectric && preciseData.realConsumption.electric) {
+        consumption = preciseData.realConsumption.electric;
+    } else if (isDiesel && preciseData.realConsumption.diesel) {
+        consumption = preciseData.realConsumption.diesel;
+    } else if (car.fuel.toUpperCase().includes('HYBRID') && preciseData.realConsumption.hybrid) {
+        consumption = preciseData.realConsumption.hybrid;
+    } else {
+        consumption = preciseData.realConsumption.petrol || 7.0;
+    }
+
+  } else {
+    // --- MODE GÉNÉRIQUE (Fallback) ---
+    const segment = getSegment(car);
+    const costs = SEGMENT_COSTS[segment];
+    baseMaint = costs.maint;
+    baseInsur = costs.insur;
+    
+    // Conso approximative
+    if (isElectric) consumption = 17;
+    else consumption = isDiesel ? 5.5 : 7.0;
+    if (segment === 'SUV' && !isElectric) consumption += 1.5;
+
+    // Fiabilité générique
+    reliabilityScore = 7;
+    if (car.mileage > 150000) reliabilityScore -= 2;
+    commonIssues = ['Usure normale'];
+  }
+
+  // --- AJUSTEMENTS COMMUNS (Km, Age) ---
+  
+  // Pénalité Kilométrique
+  const mileagePenalty = Math.max(0, Math.floor((car.mileage - 60000) / 40000) * 0.15);
+  
+  // Grosse révision des 100-120k km (Distribution souvent)
+  if (car.mileage > 90000 && car.mileage < 130000 && !isElectric) {
+     baseMaint += 250; // Lissage du coût de la distrib
+     if (!isVerified) commonIssues.push('Grosse révision imminente (Distribution ?)');
+  }
+
+  // Calculs Finaux
+  let maintMultiplier = 1 + (age * 0.02) + mileagePenalty; 
+  let insurMultiplier = 1 - (age * 0.01); 
+
+  // Ajustement Jeune Permis générique (si < 5000€ souvent jeune permis)
+  if (car.price < 5000 && car.price > 1000) {
+     insurMultiplier *= 1.4; // Surtaxe probable
   }
 
   const estMaint = Math.round(baseMaint * maintMultiplier);
-  const estInsur = Math.round(baseInsur * Math.max(0.4, insurMultiplier)); // Min 40% du prix base
+  const estInsur = Math.round(baseInsur * insurMultiplier);
 
-  const getLevel = (val: number, type: 'maint' | 'insur') => {
-     const thresholdLow = type === 'maint' ? 600 : 700;
-     const thresholdHigh = type === 'maint' ? 1200 : 1400;
-     if (val < thresholdLow) return 'low';
-     if (val > thresholdHigh) return 'high';
-     return 'medium';
-  };
+  // Calcul Carburant
+  let fuelTypeKey = 'Essence';
+  if (isDiesel) fuelTypeKey = 'Diesel';
+  if (isElectric) fuelTypeKey = 'Électrique';
+  
+  const fuelPrice = FUEL_PRICES[fuelTypeKey as keyof typeof FUEL_PRICES] || 1.8;
+  const monthlyKm = 1250; // 15k / an
+  const monthlyFuelCost = (consumption / 100) * monthlyKm * fuelPrice;
 
-  const reliability = calculateReliability(car);
+  // Determination du niveau
+  const getLevel = (val: number) => val < 700 ? 'low' : val > 1300 ? 'high' : 'medium';
 
   return {
     maintenanceYearly: {
-      min: Math.round(estMaint * 0.8),
-      max: Math.round(estMaint * 1.2),
+      min: Math.round(estMaint * 0.9),
+      max: Math.round(estMaint * 1.1),
       average: estMaint,
-      level: getLevel(estMaint, 'maint'),
-      breakdown: generateMaintenanceBreakdown(estMaint, car)
+      level: getLevel(estMaint),
+      breakdown: generateMaintenanceBreakdown(estMaint, car, isElectric)
     },
     insuranceYearly: {
       min: Math.round(estInsur * 0.8),
       max: Math.round(estInsur * 1.2),
       average: estInsur,
-      level: getLevel(estInsur, 'insur')
+      level: getLevel(estInsur)
     },
-    fuel: estimateFuel(car),
-    reliabilityScore: reliability.score,
-    commonIssues: reliability.issues
+    fuel: {
+      consumptionLiters: consumption,
+      monthlyCost: Math.round(monthlyFuelCost),
+      unit: isElectric ? 'kWh/100km' : 'L/100km'
+    },
+    reliabilityScore: Math.min(10, Math.max(1, reliabilityScore)),
+    commonIssues: commonIssues,
+    // On pourrait ajouter le flag isVerified dans le type CostEstimation plus tard
   };
 };
