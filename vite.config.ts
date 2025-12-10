@@ -8,13 +8,14 @@ const __dirname = dirname(__filename);
 
 export default defineConfig(({ mode }) => {
   // Charge les variables d'environnement depuis le fichier .env (s'il existe)
+  // Le 3ème argument '' permet de charger TOUTES les variables, pas seulement celles commençant par VITE_
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
     plugins: [react()],
     // Cette section remplace process.env.API_KEY par la vraie valeur lors du build
     define: {
-      'process.env.API_KEY': JSON.stringify(env.API_KEY),
+      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.API_KEY),
     },
     build: {
       outDir: 'dist',

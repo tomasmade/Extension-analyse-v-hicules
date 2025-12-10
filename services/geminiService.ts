@@ -2,15 +2,15 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { CarDetails, AIAnalysisResponse } from "../types";
 import { checkDailyLimit, incrementDailyUsage } from "./usageTracker";
 
+// Déclaration pour que TS ne bloque pas sur process.env (géré par Vite)
 declare const process: any;
 
-// La clé API est injectée par Vite lors du build depuis le fichier .env
-// TypeScript peut se plaindre que process.env n'existe pas, mais Vite le gère.
+// La clé est injectée par le plugin 'define' de Vite
 const API_KEY = process.env.API_KEY;
 
 export const analyzeCarWithGemini = async (car: CarDetails): Promise<AIAnalysisResponse> => {
   if (!API_KEY) {
-    throw new Error("Clé API non configurée. Veuillez ajouter API_KEY dans votre fichier .env");
+    throw new Error("Clé API introuvable. Avez-vous créé le fichier .env et relancé 'npm run build' ?");
   }
 
   // 1. Vérification du quota quotidien
@@ -35,6 +35,7 @@ export const analyzeCarWithGemini = async (car: CarDetails): Promise<AIAnalysisR
     Pour 'topWarnings', liste les 3 problèmes majeurs imminents (ex: courroie à faire, FAP).
   `;
 
+  // Définition du schéma de réponse attendu (JSON strict)
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
@@ -51,7 +52,7 @@ export const analyzeCarWithGemini = async (car: CarDetails): Promise<AIAnalysisR
         },
         required: ["fuel", "maintenance", "insurance", "total"]
       },
-      fuelConsumption: { type: Type.NUMBER, description: "Consommation estimée en L/100km ou kWh/100km" },
+      fuelConsumption: { type: Type.NUMBER, description: "Consommation estimée" },
       fuelUnit: { type: Type.STRING, enum: ["L/100km", "kWh/100km"] },
       reliabilityScore: { type: Type.NUMBER, description: "Note sur 10" },
       topWarnings: { 

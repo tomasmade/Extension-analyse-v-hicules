@@ -1,3 +1,4 @@
+// Déclaration pour que TS ne bloque pas si @types/chrome n'est pas installé
 declare const chrome: any;
 
 interface DailyUsage {
@@ -9,7 +10,7 @@ const STORAGE_KEY = 'dailyUsage';
 
 // Helper pour abstraire le mécanisme de stockage (Chrome Storage ou LocalStorage)
 const getStorage = async (): Promise<DailyUsage | null> => {
-  // Si on est dans l'extension Chrome
+  // Si on est dans l'extension Chrome (détection via l'objet global chrome)
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
     const result = await chrome.storage.local.get(STORAGE_KEY);
     return result[STORAGE_KEY] || null;
