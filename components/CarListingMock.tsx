@@ -1,6 +1,6 @@
 import React from 'react';
 import { CarDetails } from '../types';
-import { LucideMapPin, LucideCalendar, LucideGauge, LucideFuel, LucideHeart, LucideShare2 } from 'lucide-react';
+import { MapPin, Calendar, Gauge, Fuel, Heart, Share2 } from 'lucide-react';
 
 interface CarListingMockProps {
   car: CarDetails;
@@ -22,8 +22,8 @@ export const CarListingMock: React.FC<CarListingMockProps> = ({ car, isLbcMode =
             <div className="bg-gray-200 rounded-lg overflow-hidden relative aspect-[4/3]">
               <img src={car.imageUrl} alt={car.title} className="w-full h-full object-cover" />
               <div className="absolute top-4 right-4 flex gap-2">
-                 <button className="bg-white/90 p-2 rounded-full hover:bg-white text-gray-700"><LucideShare2 size={20}/></button>
-                 <button className="bg-white/90 p-2 rounded-full hover:bg-white text-gray-700"><LucideHeart size={20}/></button>
+                 <button className="bg-white/90 p-2 rounded-full hover:bg-white text-gray-700"><Share2 size={20}/></button>
+                 <button className="bg-white/90 p-2 rounded-full hover:bg-white text-gray-700"><Heart size={20}/></button>
               </div>
               <div className="absolute bottom-4 right-4 bg-black/50 text-white text-xs px-2 py-1 rounded">
                 1/15
@@ -113,7 +113,7 @@ export const CarListingMock: React.FC<CarListingMockProps> = ({ car, isLbcMode =
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                <h3 className="font-bold text-gray-900 mb-2">Localisation</h3>
                <div className="flex items-center gap-2 text-gray-700">
-                 <LucideMapPin size={18} />
+                 <MapPin size={18} />
                  <span>Paris (75001)</span>
                </div>
                <div className="mt-4 h-32 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs">
@@ -148,25 +148,25 @@ export const CarListingMock: React.FC<CarListingMockProps> = ({ car, isLbcMode =
          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="flex flex-col gap-1 p-3 bg-gray-50 rounded-lg">
             <div className="flex items-center gap-2 text-gray-500 text-sm">
-              <LucideCalendar size={16} /> Année
+              <Calendar size={16} /> Année
             </div>
             <span className="font-semibold">{car.year}</span>
           </div>
           <div className="flex flex-col gap-1 p-3 bg-gray-50 rounded-lg">
             <div className="flex items-center gap-2 text-gray-500 text-sm">
-              <LucideGauge size={16} /> Kilométrage
+              <Gauge size={16} /> Kilométrage
             </div>
             <span className="font-semibold">{car.mileage.toLocaleString()} km</span>
           </div>
           <div className="flex flex-col gap-1 p-3 bg-gray-50 rounded-lg">
             <div className="flex items-center gap-2 text-gray-500 text-sm">
-              <LucideFuel size={16} /> Énergie
+              <Fuel size={16} /> Énergie
             </div>
             <span className="font-semibold">{car.fuel}</span>
           </div>
           <div className="flex flex-col gap-1 p-3 bg-gray-50 rounded-lg">
             <div className="flex items-center gap-2 text-gray-500 text-sm">
-              <LucideMapPin size={16} /> Lieu
+              <MapPin size={16} /> Lieu
             </div>
             <span className="font-semibold">Paris (75)</span>
           </div>

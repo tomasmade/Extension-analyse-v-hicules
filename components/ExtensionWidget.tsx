@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { CarDetails, CostEstimation } from '../types';
-import { estimateCosts } from '../services/carEstimationService';
-import { LucideWrench, LucideShieldCheck, LucideChevronDown, LucideChevronUp, LucideX, LucideSparkles, LucideArrowRight, LucideArrowLeft, LucidePieChart, LucideFuel, LucideAlertTriangle, LucideCheckCircle2, LucideBadgeCheck } from 'lucide-react';
+import { CarDetails, CostEstimation, DealVerdict, AIAnalysisResponse } from '../types';
+import { estimateCosts, calculateQuickVerdict } from '../services/carEstimationService';
+import { analyzeCarWithGemini } from '../services/geminiService';
+import { getRemainingUsage } from '../services/usageTracker';
+import { Sparkles, X, ChevronRight, AlertTriangle, CheckCircle2, TrendingUp, ArrowRight, Wallet, Wrench, Fuel, ShieldCheck, Info, Loader2, Zap } from 'lucide-react';
 
 interface ExtensionWidgetProps {
   car: CarDetails;
@@ -10,244 +12,356 @@ interface ExtensionWidgetProps {
   mode?: 'floating' | 'inline';
 }
 
+type ViewState = 'level1' | 'analyzing' | 'level2' | 'level3';
+
 export const ExtensionWidget: React.FC<ExtensionWidgetProps> = ({ 
   car, 
   onClose, 
-  minimizedByDefault = false,
   mode = 'floating' 
 }) => {
-  const [costs, setCosts] = useState<CostEstimation | null>(null);
-  const [isExpanded, setIsExpanded] = useState(!minimizedByDefault);
-  const [showMaintenanceDetails, setShowMaintenanceDetails] = useState(false);
+  // États de données
+  const [localVerdict, setLocalVerdict] = useState<DealVerdict | null>(null);
+  const [aiData, setAiData] = useState<AIAnalysisResponse | null>(null);
+  const [localCosts, setLocalCosts] = useState<CostEstimation | null>(null);
+  const [remainingCredits, setRemainingCredits] = useState<number>(10);
+  
+  // États de vue
+  const [view, setView] = useState<ViewState>('level1');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Initialisation Niveau 1 (Local)
   useEffect(() => {
-    if (mode === 'inline') {
-      setIsExpanded(true);
-    }
-  }, [mode]);
-
-  useEffect(() => {
-    const data = estimateCosts(car);
-    setCosts(data);
-    setShowMaintenanceDetails(false);
+    setLocalVerdict(calculateQuickVerdict(car));
+    setLocalCosts(estimateCosts(car));
+    getRemainingUsage().then(setRemainingCredits);
   }, [car]);
 
-  if (!costs) return null;
+  // Fonction pour déclencher l'analyse IA (Passage au Niveau 2/3)
+  const handleAnalyzeClick = async () => {
+    setView('analyzing');
+    setErrorMsg(null);
 
-  // COULEUR LBC OFFICIELLE : #ec5a13 (Orange)
-  const lbcOrange = '#ec5a13';
-  
-  // Détection si c'est des données vérifiées
-  const isVerifiedModel = costs.commonIssues.length > 0 && !costs.commonIssues.includes('Usure normale');
-
-  const getReliabilityColor = (score: number) => {
-    if (score >= 8) return 'text-green-700 bg-green-50 border-green-200';
-    if (score >= 5) return 'text-orange-700 bg-orange-50 border-orange-200';
-    return 'text-red-700 bg-red-50 border-red-200';
+    try {
+      // Plus besoin de clé en paramètre, elle est intégrée
+      const result = await analyzeCarWithGemini(car);
+      setAiData(result);
+      setView('level2'); // On arrive sur le résumé enrichi par l'IA
+      
+      // Mise à jour des crédits
+      getRemainingUsage().then(setRemainingCredits);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || "Erreur d'analyse.");
+      setView('level1'); // Retour au niveau 1 avec message d'erreur
+    }
   };
 
+  if (!localVerdict || !localCosts) return null;
+
   const containerClasses = mode === 'floating' 
-    ? `fixed z-50 transition-all duration-300 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl border border-gray-100 overflow-hidden bg-white ${isExpanded ? 'w-full max-w-md bottom-4 right-4' : 'w-auto bottom-4 right-4 cursor-pointer hover:bg-gray-50'}`
-    : `w-full rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm mt-4`;
+    ? `fixed z-50 transition-all duration-300 shadow-2xl rounded-xl border border-gray-100 overflow-hidden bg-white w-[380px] bottom-4 right-4 font-sans`
+    : `w-full rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm mt-4 font-sans`;
 
-  // --- VUE RÉDUITE (Floating fermé) ---
-  if (!isExpanded && mode === 'floating') {
-    return (
-      <div className={containerClasses} onClick={() => setIsExpanded(true)}>
-        <div className="p-4 flex items-center gap-3">
-          <div className="bg-[#ec5a13] p-2 rounded-full text-white shadow-sm">
-            <LucideSparkles size={24} />
-          </div>
-          <div>
-            <div className="font-bold text-gray-900 text-base">Budget Auto</div>
-            <div className="text-sm text-gray-500">Voir l'estimation</div>
-          </div>
-          <LucideChevronUp className="text-gray-400 ml-2" />
-        </div>
-      </div>
-    );
-  }
-
-  // --- VUE DÉTAILS ENTRETIEN ---
-  if (showMaintenanceDetails) {
+  // --- ÉCRAN : ANALYSE EN COURS ---
+  if (view === 'analyzing') {
     return (
       <div className={containerClasses}>
-        <div className="bg-gray-50 p-4 border-b border-gray-100 flex items-center justify-between">
-          <button 
-            onClick={() => setShowMaintenanceDetails(false)}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium text-sm transition-colors"
-          >
-            <LucideArrowLeft size={18} />
-            Retour
-          </button>
-          <span className="font-bold text-gray-800 text-base">Détail Entretien</span>
-        </div>
-        
-        <div className="p-5 space-y-4">
-          <div className="flex items-center gap-3 p-4 bg-orange-50 rounded-lg border border-orange-100">
-            <LucideWrench className="text-[#ec5a13]" size={24} />
-            <div>
-              <p className="text-sm text-gray-600">Total estimé</p>
-              <p className="text-2xl font-bold text-[#ec5a13]">{costs.maintenanceYearly.average}€<span className="text-sm text-gray-500 font-normal">/an</span></p>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {costs.maintenanceYearly.breakdown.map((item, idx) => (
-              <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-                <div>
-                  <p className="font-medium text-gray-800 text-sm">{item.category}</p>
-                  <p className="text-xs text-gray-500">{item.frequency}</p>
-                </div>
-                <span className="font-bold text-gray-900 text-base">{item.cost} €</span>
-              </div>
-            ))}
+        <div className="p-8 flex flex-col items-center justify-center text-center space-y-4 min-h-[200px]">
+          <Loader2 className="animate-spin text-[#ec5a13]" size={40} />
+          <div>
+            <h3 className="font-bold text-gray-900 text-lg">Analyse IA en cours...</h3>
+            <p className="text-gray-500 text-sm mt-1">Comparaison des prix et vérification fiabilité</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // --- VUE PRINCIPALE ---
-  return (
-    <div className={containerClasses}>
-      {/* HEADER */}
-      <div className="bg-white p-4 border-b border-gray-100 flex justify-between items-start">
-        <div className="flex items-center gap-2.5">
-          <div className="bg-[#ec5a13] text-white p-1.5 rounded-md">
-            <LucideSparkles size={18} />
-          </div>
-          <div>
-             <h3 className="font-bold text-gray-900 text-lg leading-tight">Assistant Budget</h3>
-             {isVerifiedModel && (
-               <span title="Données basées sur ce modèle précis" className="flex items-center gap-1 text-xs text-green-600 font-medium bg-green-50 px-1.5 py-0.5 rounded mt-0.5 w-fit">
-                 <LucideBadgeCheck size={12} />
-                 Modèle Vérifié
-               </span>
-             )}
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-1">
-          {mode === 'floating' && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); setIsExpanded(false); }}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-full transition-colors"
-            >
-              <LucideChevronDown size={20} />
-            </button>
-          )}
-          {onClose && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); onClose(); }}
-              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-            >
-              <LucideX size={20} />
-            </button>
-          )}
-        </div>
-      </div>
+  // --- NIVEAU 1 : ESTIMATIONS LOCALES (Immédiat) ---
+  if (view === 'level1') {
+    // Calcul du total annuel estimé (local)
+    const annualFuel = localCosts.fuel.monthlyCost * 12;
+    const totalAnnual = annualFuel + localCosts.maintenanceYearly.average + localCosts.insuranceYearly.average;
 
-      <div className="p-5 space-y-5">
-        
-        {/* GRILLE BUDGET */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* CARTE ENTRETIEN */}
-          <div 
-            onClick={() => setShowMaintenanceDetails(true)}
-            className="col-span-1 bg-orange-50 rounded-xl p-4 border border-orange-100 hover:border-orange-300 transition-colors cursor-pointer group relative"
-          >
-            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity text-orange-400">
-               <LucideArrowRight size={18} />
-            </div>
-            <div className="flex items-center gap-2 mb-2 text-orange-700">
-              <LucideWrench size={18} />
-              <span className="text-sm font-bold uppercase tracking-wide">Entretien</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900 leading-none mb-1">
-              {costs.maintenanceYearly.average}€
-              <span className="text-sm font-medium text-gray-500 ml-0.5">/an</span>
-            </div>
-            <div className="text-sm text-orange-600 group-hover:underline flex items-center gap-1 mt-2 font-medium">
-              Voir le détail
-            </div>
-          </div>
-
-          {/* CARTE ASSURANCE */}
-          <div className="col-span-1 bg-blue-50 rounded-xl p-4 border border-blue-100">
-            <div className="flex items-center gap-2 mb-2 text-blue-700">
-              <LucideShieldCheck size={18} />
-              <span className="text-sm font-bold uppercase tracking-wide">Assurance</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900 leading-none mb-1">
-              {costs.insuranceYearly.average}€
-              <span className="text-sm font-medium text-gray-500 ml-0.5">/an</span>
-            </div>
-            <div className="text-sm text-blue-600 mt-2">
-              Jeune permis estimé
-            </div>
-          </div>
-        </div>
-
-        {/* CARTE CARBURANT */}
-        <div className="bg-green-50 rounded-xl p-4 border border-green-100 flex justify-between items-center">
-           <div>
-              <div className="flex items-center gap-2 mb-1 text-green-700">
-                <LucideFuel size={18} />
-                <span className="text-sm font-bold">Carburant estimé</span>
-              </div>
-              <div className="text-sm text-green-800">
-                Base 15 000 km/an
-              </div>
-           </div>
-           <div className="text-right">
-              <div className="text-xl font-bold text-gray-900">
-                {costs.fuel.monthlyCost}€<span className="text-sm font-medium text-gray-500">/mois</span>
-              </div>
-              <div className="text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full inline-block mt-1 font-semibold">
-                ~ {costs.fuel.consumptionLiters} {costs.fuel.unit}
-              </div>
-           </div>
-        </div>
-
-        {/* SECTION FIABILITÉ */}
-        <div className={`rounded-xl border p-4 ${getReliabilityColor(costs.reliabilityScore)}`}>
-           <div className="flex justify-between items-center mb-3">
-              <h4 className="font-bold flex items-center gap-2 text-base">
-                 {costs.reliabilityScore >= 8 ? <LucideCheckCircle2 size={20}/> : <LucideAlertTriangle size={20}/>}
-                 Score Fiabilité
-              </h4>
-              <span className="text-2xl font-black">{costs.reliabilityScore}/10</span>
-           </div>
-           
-           {/* Jauge visuelle */}
-           <div className="w-full h-2.5 bg-gray-200/50 rounded-full mb-3 overflow-hidden">
-             <div 
-               className={`h-full rounded-full transition-all duration-1000 ${
-                 costs.reliabilityScore >= 8 ? 'bg-green-500' : 
-                 costs.reliabilityScore >= 5 ? 'bg-orange-500' : 'bg-red-500'
-               }`} 
-               style={{ width: `${costs.reliabilityScore * 10}%` }}
-             />
-           </div>
-
-           {/* Points de vigilance */}
-           {costs.commonIssues.length > 0 && (
-             <div className="mt-3 pt-3 border-t border-black/5">
-               <p className="text-sm font-semibold mb-2">À surveiller sur ce modèle :</p>
-               <ul className="space-y-1">
-                 {costs.commonIssues.map((issue, i) => (
-                   <li key={i} className="text-sm flex items-start gap-2">
-                     <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-current opacity-70 flex-shrink-0" />
-                     <span className="leading-tight">{issue}</span>
-                   </li>
-                 ))}
-               </ul>
+    return (
+      <div className={containerClasses}>
+        {/* HEADER VERDICT */}
+        <div className="bg-white p-4 border-b border-gray-100 flex justify-between items-start">
+          <div className="flex items-center gap-3">
+             <div className={`p-2 rounded-full ${localVerdict.color.replace('text-', 'bg-').replace('bg-', 'bg-opacity-20 ')}`}>
+               <Sparkles size={24} className={localVerdict.color.split(' ')[0]} />
              </div>
-           )}
+             <div>
+               <div className={`font-bold text-xl ${localVerdict.color.split(' ')[0]}`}>
+                 {localVerdict.label}
+               </div>
+               <div className="text-xs text-gray-500 flex items-center gap-1">
+                 {localVerdict.priceGapPercent && localVerdict.priceGapPercent < 0 
+                   ? `Prix ~${Math.abs(localVerdict.priceGapPercent)}% sous le marché`
+                   : 'Estimation basée sur l\'algorithme local'
+                 }
+               </div>
+             </div>
+          </div>
+          {/* Badge crédits */}
+          <div className="text-xs font-semibold bg-gray-100 px-2 py-1 rounded text-gray-500">
+             {remainingCredits}/10 analyses
+          </div>
         </div>
 
+        {errorMsg && (
+          <div className="bg-red-50 p-3 text-sm text-red-700 border-b border-red-100 flex items-start gap-2">
+            <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        <div className="p-5 space-y-5">
+           {/* GRILLE DES COÛTS (LOCAL) */}
+           <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+             <h4 className="text-base font-bold text-gray-700 mb-3 flex items-center gap-2">
+               <Wallet size={18}/> Estimations
+             </h4>
+             
+             {/* Bloc Carburant mis en avant */}
+             <div className="bg-white p-3 rounded-lg border border-green-100 mb-3 flex justify-between items-center shadow-sm">
+                <div className="flex items-center gap-3">
+                   <div className="bg-green-50 p-2 rounded-full text-green-600">
+                      <Fuel size={20} />
+                   </div>
+                   <div>
+                      <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">Carburant</div>
+                      <div className="font-bold text-lg text-gray-900 leading-none mt-0.5">
+                        {localCosts.fuel.consumptionLiters} <span className="text-sm font-normal text-gray-600">{localCosts.fuel.unit}</span>
+                      </div>
+                   </div>
+                </div>
+                <div className="text-right">
+                   <div className="font-bold text-xl text-gray-900">{localCosts.fuel.monthlyCost}€</div>
+                   <div className="text-xs text-gray-500">/mois</div>
+                </div>
+             </div>
+
+             <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white p-3 rounded-lg border border-gray-100">
+                   <div className="text-xs text-gray-500 mb-1 flex items-center gap-1"><Wrench size={12}/> Entretien</div>
+                   <div>
+                      <span className="font-bold text-lg text-gray-800">{localCosts.maintenanceYearly.average}€</span>
+                      <span className="text-xs text-gray-500">/an</span>
+                   </div>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-gray-100">
+                   <div className="text-xs text-gray-500 mb-1 flex items-center gap-1"><ShieldCheck size={12}/> Assurance</div>
+                   <div>
+                      <span className="font-bold text-lg text-gray-800">{localCosts.insuranceYearly.average}€</span>
+                      <span className="text-xs text-gray-500">/an</span>
+                   </div>
+                </div>
+             </div>
+             
+             <div className="mt-3 pt-2 border-t border-gray-200 flex justify-between items-center text-xs text-gray-500">
+                <span>Budget total estimé</span>
+                <span className="font-bold text-sm text-gray-700">~{Math.round(totalAnnual)}€ / an</span>
+             </div>
+           </div>
+
+           {/* FIABILITÉ LOCALE */}
+           <div className="flex items-center justify-between px-2">
+              <span className="text-sm font-semibold text-gray-600 flex items-center gap-2">
+                <Wrench size={16} /> Fiabilité modèle
+              </span>
+              <div className="flex items-center gap-2">
+                <div className="flex gap-0.5">
+                  {[1,2,3,4,5].map(i => (
+                    <div key={i} className={`w-6 h-2 rounded-full ${
+                      (localCosts.reliabilityScore / 2) >= i ? 'bg-green-500' : 'bg-gray-200'
+                    }`} />
+                  ))}
+                </div>
+                <span className="font-bold text-sm">{localCosts.reliabilityScore}/10</span>
+              </div>
+           </div>
+
+           {/* CTA : ANALYSE IA */}
+           <button 
+              onClick={handleAnalyzeClick}
+              disabled={remainingCredits <= 0}
+              className={`w-full font-bold py-3 rounded-lg transition-colors flex justify-center items-center gap-2 shadow-md ${
+                remainingCredits > 0 
+                  ? 'bg-[#ec5a13] text-white hover:bg-[#d64a0b]' 
+                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              <Zap size={18} />
+              {remainingCredits > 0 ? "Lancer l'analyse IA complète" : "Limite quotidienne atteinte"}
+            </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // --- NIVEAU 2 : RÉSULTAT IA (Résumé enrichi) ---
+  if (view === 'level2' && aiData) {
+    return (
+      <div className={containerClasses}>
+        {/* HEADER */}
+        <div className="bg-white p-4 border-b border-gray-100 flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide ${
+                aiData.dealQuality === 'good' ? 'bg-green-100 text-green-800' : 
+                aiData.dealQuality === 'bad' ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'
+              }`}>
+                {aiData.dealQuality === 'good' ? 'Bon Plan' : aiData.dealQuality === 'bad' ? 'Prix Élevé' : 'Offre Correcte'}
+              </span>
+              <span className="text-xs text-gray-500 flex items-center gap-1"><Sparkles size={10} /> Analyse IA</span>
+            </div>
+            <h3 className="font-bold text-gray-900 text-xl leading-tight">{aiData.dealSummary}</h3>
+          </div>
+          <button onClick={() => setView('level1')} className="text-gray-400 hover:text-gray-600"><X size={24}/></button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* COÛTS ANNUELS IA */}
+          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 relative">
+             <div className="absolute top-0 right-0 -mt-2 -mr-2 bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                <Sparkles size={10}/> AJUSTÉ PAR IA
+             </div>
+             <h4 className="text-base font-bold text-gray-700 mb-3 flex items-center gap-2">
+               <Wallet size={18}/> Coûts Ajustés
+             </h4>
+             
+             {/* CARBURANT IA */}
+             <div className="flex justify-between items-center mb-4 border-b border-gray-200 pb-3">
+                 <div className="flex items-center gap-3">
+                    <div className="bg-white p-2 rounded-full text-gray-700 shadow-sm border border-gray-100">
+                       <Fuel size={20} />
+                    </div>
+                    <div>
+                       <div className="text-xs text-gray-500">Conso. estimée</div>
+                       <div className="font-bold text-lg text-gray-900">{aiData.fuelConsumption} {aiData.fuelUnit}</div>
+                    </div>
+                 </div>
+                 <div className="text-right">
+                    <div className="font-bold text-xl text-gray-900">~{Math.round(aiData.annualCosts.fuel / 12)}€</div>
+                    <div className="text-xs text-gray-500">/mois</div>
+                 </div>
+             </div>
+
+             <div className="grid grid-cols-2 gap-4 text-center">
+                <div className="bg-white p-2 rounded border border-gray-100">
+                   <div className="text-xs text-gray-500 mb-1">Entretien</div>
+                   <div className="font-bold text-base">{aiData.annualCosts.maintenance}€<span className="text-xs font-normal text-gray-400">/an</span></div>
+                </div>
+                <div className="bg-white p-2 rounded border border-gray-100">
+                   <div className="text-xs text-gray-500 mb-1">Assurance</div>
+                   <div className="font-bold text-base">{aiData.annualCosts.insurance}€<span className="text-xs font-normal text-gray-400">/an</span></div>
+                </div>
+             </div>
+          </div>
+
+          {/* TOP ALERTS */}
+          <div>
+            <h4 className="text-base font-bold text-gray-700 mb-2 flex items-center gap-2">
+              <AlertTriangle size={18} className="text-orange-500"/> Points de Vigilance
+            </h4>
+            <ul className="space-y-2">
+              {aiData.topWarnings.map((warn, i) => (
+                <li key={i} className="text-sm flex items-start gap-2 text-gray-700 bg-orange-50 p-3 rounded border border-orange-100">
+                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0" />
+                  <span className="leading-snug">{warn}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* ACTIONS */}
+          <div className="space-y-2 pt-2">
+             <button 
+               onClick={() => setView('level3')}
+               className="w-full bg-gray-900 text-white font-bold py-3 rounded-lg hover:bg-black transition-colors flex justify-center items-center gap-2"
+             >
+               <Info size={18} />
+               Voir tous les détails
+             </button>
+             <div className="grid grid-cols-2 gap-2">
+               <a href="https://histovec.interieur.gouv.fr/histovec/home" target="_blank" className="text-center py-2 text-xs font-semibold text-gray-600 bg-gray-100 rounded hover:bg-gray-200">
+                 📋 Histovec
+               </a>
+               <a href="https://rapex.ec.europa.eu/Security/rapex/rapid/" target="_blank" className="text-center py-2 text-xs font-semibold text-gray-600 bg-gray-100 rounded hover:bg-gray-200">
+                 🔔 Rappels
+               </a>
+             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- NIVEAU 3 : DÉTAILS COMPLETS (Reste identique) ---
+  if (view === 'level3' && aiData) {
+    return (
+      <div className={containerClasses}>
+        <div className="bg-gray-50 p-4 border-b border-gray-100 flex items-center gap-2">
+          <button onClick={() => setView('level2')} className="text-gray-500 hover:text-gray-800">
+            <ArrowRight className="rotate-180" size={24} />
+          </button>
+          <h3 className="font-bold text-gray-900 text-lg">Analyse Détaillée</h3>
+        </div>
+
+        <div className="p-5 space-y-6 max-h-[500px] overflow-y-auto">
+          
+          {/* PRIX */}
+          <section>
+            <h4 className="font-bold text-xl mb-2 flex items-center gap-2"><TrendingUp size={24} className="text-[#ec5a13]"/> Analyse Prix</h4>
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-base">
+               <div className="flex justify-between mb-2">
+                 <span className="text-gray-600">Prix demandé :</span>
+                 <span className="font-bold">{car.price} €</span>
+               </div>
+               <div className="flex justify-between mb-2">
+                 <span className="text-gray-600">Estimation juste :</span>
+                 <span className="font-bold text-green-700">~{aiData.estimatedRealPrice} €</span>
+               </div>
+               <p className="mt-3 text-gray-700 italic border-t border-gray-200 pt-3 text-sm">"{aiData.dealSummary}"</p>
+            </div>
+          </section>
+
+          {/* FIABILITÉ DÉTAILLÉE */}
+          <section>
+             <h4 className="font-bold text-xl mb-2 flex items-center gap-2"><Wrench size={24} className="text-[#ec5a13]"/> Fiabilité ({aiData.reliabilityScore}/10)</h4>
+             <p className="text-base text-gray-700 mb-4 bg-blue-50 p-3 rounded-lg border border-blue-100 leading-relaxed">
+               {aiData.detailedAnalysis.modelReliabilityDetails}
+             </p>
+             
+             <div className="grid grid-cols-1 gap-3">
+               <div className="bg-green-50 p-3 rounded border border-green-100">
+                 <h5 className="font-bold text-sm uppercase text-green-700 mb-2 flex items-center gap-1"><CheckCircle2 size={16}/> Points Forts</h5>
+                 <ul className="text-sm space-y-1.5">
+                   {aiData.detailedAnalysis.pros.map((p, i) => <li key={i} className="flex gap-2 text-gray-700">• {p}</li>)}
+                 </ul>
+               </div>
+               <div className="bg-red-50 p-3 rounded border border-red-100">
+                 <h5 className="font-bold text-sm uppercase text-red-700 mb-2 flex items-center gap-1"><AlertTriangle size={16}/> Points Faibles</h5>
+                 <ul className="text-sm space-y-1.5">
+                   {aiData.detailedAnalysis.cons.map((c, i) => <li key={i} className="flex gap-2 text-gray-700">• {c}</li>)}
+                 </ul>
+               </div>
+             </div>
+          </section>
+
+          {/* CONSEIL ENTRETIEN */}
+          <section>
+             <h4 className="font-bold text-xl mb-2 flex items-center gap-2"><Fuel size={24} className="text-[#ec5a13]"/> Conseil Maintenance</h4>
+             <p className="text-base text-gray-600 bg-yellow-50 p-4 rounded border border-yellow-100 leading-relaxed">
+               {aiData.detailedAnalysis.maintenanceAdvice}
+             </p>
+          </section>
+
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 };

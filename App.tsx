@@ -3,7 +3,7 @@ import { CarListingMock } from './components/CarListingMock';
 import { ExtensionWidget } from './components/ExtensionWidget';
 import { CarDetails } from './types';
 import { extractCarDetailsFromDOM } from './services/domParser';
-import { LucideInfo } from 'lucide-react';
+import { Info } from 'lucide-react';
 
 // Mock Data simulant une annonce Leboncoin
 const LBC_MOCK_DATA = {
@@ -75,7 +75,7 @@ const App: React.FC = () => {
         
         {/* Banner Info Dev */}
         <div className="mb-6 flex items-center gap-3 bg-blue-50 text-blue-800 p-3 rounded-lg border border-blue-100 max-w-6xl mx-auto text-sm">
-           <LucideInfo size={18} className="flex-shrink-0 text-blue-600" />
+           <Info size={18} className="flex-shrink-0 text-blue-600" />
            <p>
              <strong>Mode Simulation :</strong> Cette page reproduit la structure technique de LeBonCoin. 
              L'encart "Assistant Budget Auto" ci-dessous est injecté dynamiquement comme le ferait l'extension réelle.

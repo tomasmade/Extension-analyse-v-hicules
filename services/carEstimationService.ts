@@ -1,4 +1,4 @@
-import { CarDetails, CostEstimation, CostBreakdownItem } from '../types';
+import { CarDetails, CostEstimation, CostBreakdownItem, DealVerdict } from '../types';
 import { findPreciseCarData } from './carDatabase';
 
 // Tables de correspondance génériques (Fallback)
@@ -17,8 +17,6 @@ const FUEL_PRICES = {
   'Electrique': 0.25,
   'Hybride': 1.80
 };
-
-// ... (Fonctions helpers inchangées) ...
 
 const getSegment = (car: CarDetails): string => {
   const model = car.model.toUpperCase();
@@ -63,7 +61,66 @@ const generateMaintenanceBreakdown = (totalCost: number, car: CarDetails, isElec
   return breakdown;
 };
 
-// ... (Reste des helpers) ...
+/**
+ * NIVEAU 1 : VERDICT RAPIDE (Local / Sans API)
+ * Calcule une estimation "Bon plan" basée sur des heuristiques simples (Année/Km/Prix)
+ */
+export const calculateQuickVerdict = (car: CarDetails): DealVerdict => {
+  const currentYear = new Date().getFullYear();
+  const carAge = Math.max(1, currentYear - car.year);
+  const kmPerYear = car.mileage / carAge;
+
+  // Logique simple pour MVP :
+  // Une voiture qui roule peu (<10k/an) et qui n'est pas trop chère pour son âge est un "Bon plan"
+  
+  // 1. Analyse Kilométrique
+  let kmStatus = 'normal';
+  if (kmPerYear < 10000) kmStatus = 'low';
+  if (kmPerYear > 25000) kmStatus = 'high';
+
+  // 2. Analyse Prix (Très arbitraire sans vraie cote, basé sur des décotes théoriques)
+  // Prix neuf théorique moyen par segment
+  const segment = getSegment(car);
+  let baseNewPrice = 20000;
+  if (segment === 'SUV') baseNewPrice = 35000;
+  if (segment === 'PREMIUM') baseNewPrice = 50000;
+  if (segment === 'LUXURY') baseNewPrice = 90000;
+
+  // Décote théorique : -20% an 1, puis -10%/an
+  let theoreticalPrice = baseNewPrice * 0.8; // An 1
+  for (let i = 1; i < carAge; i++) {
+    theoreticalPrice = theoreticalPrice * 0.9;
+  }
+  // Ajustement km
+  if (kmStatus === 'high') theoreticalPrice *= 0.8;
+  if (kmStatus === 'low') theoreticalPrice *= 1.1;
+
+  const priceGap = ((car.price - theoreticalPrice) / theoreticalPrice) * 100;
+
+  // Verdict
+  if (priceGap < -10) {
+    return { 
+      status: 'good', 
+      label: '✓ Bon plan probable', 
+      color: 'text-green-700 bg-green-50',
+      priceGapPercent: Math.round(priceGap)
+    };
+  } else if (priceGap > 15) {
+    return { 
+      status: 'bad', 
+      label: '⚠️ Prix élevé estimé', 
+      color: 'text-red-700 bg-red-50',
+      priceGapPercent: Math.round(priceGap)
+    };
+  } else {
+    return { 
+      status: 'fair', 
+      label: 'Prix cohérent', 
+      color: 'text-blue-700 bg-blue-50',
+      priceGapPercent: Math.round(priceGap)
+    };
+  }
+};
 
 export const estimateCosts = (car: CarDetails): CostEstimation => {
   // 1. TENTATIVE DE RECONNAISSANCE PRÉCISE (Database)
@@ -89,11 +146,6 @@ export const estimateCosts = (car: CarDetails): CostEstimation => {
     reliabilityScore = preciseData.reliabilityScore;
     commonIssues = [...preciseData.knownIssues];
     
-    // Ajout du conseil spécifique dans les issues pour l'affichage
-    if (preciseData.specificAdvice) {
-       // On le mettra en évidence dans l'UI idéalement, mais ici on l'ajoute aux issues
-    }
-
     // Récupération consommation exacte
     if (isElectric && preciseData.realConsumption.electric) {
         consumption = preciseData.realConsumption.electric;
@@ -179,6 +231,5 @@ export const estimateCosts = (car: CarDetails): CostEstimation => {
     },
     reliabilityScore: Math.min(10, Math.max(1, reliabilityScore)),
     commonIssues: commonIssues,
-    // On pourrait ajouter le flag isVerified dans le type CostEstimation plus tard
   };
 };

@@ -40,8 +40,38 @@ export interface CostEstimation {
   commonIssues: string[];
 }
 
-export interface AIAnalysis {
-  pros: string[];
-  cons: string[];
-  verdict: string;
+// NIVEAU 1 : Verdict Rapide Local
+export interface DealVerdict {
+  status: 'good' | 'fair' | 'bad' | 'unknown';
+  label: string;
+  color: string;
+  priceGapPercent?: number; // ex: -12 (pour 12% moins cher)
+}
+
+// NIVEAU 2 & 3 : Réponse IA Structurée
+export interface AIAnalysisResponse {
+  dealQuality: 'good' | 'fair' | 'bad';
+  dealSummary: string; // Phrase courte "Prix 12% sous le marché"
+  estimatedRealPrice: number;
+  
+  annualCosts: {
+    fuel: number;
+    maintenance: number;
+    insurance: number;
+    total: number;
+  };
+  
+  fuelConsumption: number;
+  fuelUnit: string;
+
+  reliabilityScore: number; // 0-10
+  topWarnings: string[]; // Top 3 pour le niveau 2
+  
+  // Niveau 3 (Détails)
+  detailedAnalysis: {
+    pros: string[];
+    cons: string[];
+    maintenanceAdvice: string;
+    modelReliabilityDetails: string;
+  };
 }
